@@ -43,6 +43,35 @@ def extract_data_listings(html):
     id_finder = re.compile(r'PR[\d]+~')
     return html.find_all('div', id=id_finder)
 
+
+def has_2_tds(elem):
+    is_tr = elem.name == 'tr'
+    td_children = elem.find_all('td', recursive=False)
+    has_2 = len(td_children) == 2
+    return is_tr and has_2
+
+
+def clean_data(td):
+    data = td.string
+    try:
+        return data.strip(" \n:-")
+    except AttributeError:
+        return u""
+
+
+def extract_restaurant_metadata(elem):
+    metadata_rows = elem.find('tbody').find_all(
+        has_2_tds, recursive=False
+    )
+    rdata = {}
+    current_label = ''
+    for row in metadata_rows:
+        key_cell, val_cell = row.find_all('td', recursive=False)
+        new_label = clean_data(key_cell)
+        current_label = new_label if new_label else current_label
+        rdata.setdefault(current_label, []).append(clean_data(val_cell))
+    return rdata
+
 if __name__ == '__main__':
     kwargs = {
         'Inspection_Start': '10/1/2015',
@@ -55,5 +84,6 @@ if __name__ == '__main__':
         html, encoding = get_inspection_page(**kwargs)
     doc = parse_source(html, encoding)
     listings = extract_data_listings(doc)
-    print(len(listings))
-    print(listings[0].prettify())
+    for listing in listings:
+        metadata = extract_restaurant_metadata(listing)
+        print(metadata)
